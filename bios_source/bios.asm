@@ -1,38 +1,30 @@
-; BIOS source for 8086tiny IBM PC emulator. Compiles with NASM.
-; Copyright 2013, Adrian Cable (adrian.cable@gmail.com) - http://www.megalith.co.uk/8086tiny
+; BIOS source for 8086tiny IBM PC emulator (revision 1.15 and above). Compiles with NASM.
+; Copyright 2013-14, Adrian Cable (adrian.cable@gmail.com) - http://www.megalith.co.uk/8086tiny
 ;
-; Revision 1.20
+; Revision 1.50
 ;
 ; This work is licensed under the MIT License. See included LICENSE.TXT.
 
 	cpu	8086
-
-; Defines
-
-%define	biosbase 0x000f			; BIOS loads at segment 0xF000
 
 ; Here we define macros for some custom instructions that help the emulator talk with the outside
 ; world. They are described in detail in the hint.html file, which forms part of the emulator
 ; distribution.
 
 %macro	extended_putchar_al 0
-	db	0x0f
-	db	0x00
+	db	0x0f, 0x00
 %endmacro
 
 %macro	extended_get_rtc 0
-	db	0x0f
-	db	0x01
+	db	0x0f, 0x01
 %endmacro
 
 %macro	extended_read_disk 0
-	db	0x0f
-	db	0x02
+	db	0x0f, 0x02
 %endmacro
 
 %macro	extended_write_disk 0
-	db	0x0f
-	db	0x03
+	db	0x0f, 0x03
 %endmacro
 
 org	100h				; BIOS loads at offset 0x0100
@@ -44,114 +36,31 @@ main:
 ; Here go pointers to the different data tables used for instruction decoding
 
 	dw	rm_mode12_reg1	; Table 0: R/M mode 1/2 "register 1" lookup
-	dw	biosbase
-	dw	rm_mode12_reg2	; Table 1: R/M mode 1/2 "register 2" lookup
-	dw	biosbase
+	dw	rm_mode012_reg2	; Table 1: R/M mode 1/2 "register 2" lookup
 	dw	rm_mode12_disp	; Table 2: R/M mode 1/2 "DISP multiplier" lookup
-	dw	biosbase
 	dw	rm_mode12_dfseg	; Table 3: R/M mode 1/2 "default segment" lookup
-	dw	biosbase
 	dw	rm_mode0_reg1	; Table 4: R/M mode 0 "register 1" lookup
-	dw	biosbase
-	dw	rm_mode0_reg2	; Table 5: R/M mode 0 "register 2" lookup
-	dw	biosbase
+	dw	rm_mode012_reg2 ; Table 5: R/M mode 0 "register 2" lookup
 	dw	rm_mode0_disp	; Table 6: R/M mode 0 "DISP multiplier" lookup
-	dw	biosbase
 	dw	rm_mode0_dfseg	; Table 7: R/M mode 0 "default segment" lookup
-	dw	biosbase
 	dw	xlat_ids	; Table 8: Translation of raw opcode index ("Raw ID") to function number ("Xlat'd ID")
-	dw	biosbase
-	dw	0		; Table 9: (Defunct)
-	dw	biosbase
-	dw	0		; Table 10: (Defunct)
-	dw	biosbase
-	dw	0		; Table 11: (Defunct)
-	dw	biosbase
-	dw	0		; Table 12: (Defunct)
-	dw	biosbase
-	dw	0		; Table 13: (Defunct)
-	dw	biosbase
-	dw	ex_data		; Table 14: Translation of Raw ID to Extra Data
-	dw	biosbase
-	dw	std_szp		; Table 15: Translation of Raw ID to SZP flags set yes/no
-	dw	biosbase
-	dw	std_ao		; Table 16: Translation of Raw ID to AO flags set yes/no
-	dw	biosbase
-	dw	std_o0c0	; Table 17: Translation of Raw ID to OF=0 CF=0 set yes/no
-	dw	biosbase
-	dw	base_size	; Table 18: Translation of Raw ID to base instruction size (bytes)
-	dw	biosbase
-	dw	i_w_adder	; Table 19: Translation of Raw ID to i_w size adder yes/no
-	dw	biosbase
-	dw	i_mod_adder	; Table 20: Translation of Raw ID to i_mod size adder yes/no
-	dw	biosbase
-	dw	jxx_dec_a	; Table 21: Jxx decode table A
-	dw	biosbase
-	dw	jxx_dec_b	; Table 22: Jxx decode table B
-	dw	biosbase
-	dw	jxx_dec_c	; Table 23: Jxx decode table C
-	dw	biosbase
-	dw	jxx_dec_d	; Table 24: Jxx decode table D
-	dw	biosbase
-	dw	flags_mult	; Table 25: FLAGS multipliers
-	dw	biosbase
-	dw	daa_rslt_ca00	; Table 26: DAA result, CF = 0, AF = 0
-	dw	biosbase
-	dw	daa_cf_ca00_ca01_das_cf_ca00	; Table 27: DAA CF out, CF = 0, AF = 0
-	dw	biosbase
-	dw	daa_af_ca00_ca10_das_af_ca00_ca10	; Table 28: DAA AF out, CF = 0, AF = 0
-	dw	biosbase
-	dw	daa_rslt_ca01	; Table 29: DAA result, CF = 0, AF = 1
-	dw	biosbase
-	dw	daa_cf_ca00_ca01_das_cf_ca00	; Table 30: DAA CF out, CF = 0, AF = 1
-	dw	biosbase
-	dw	daa_af_ca01_cf_ca10_cf_ca11_af_ca11_das_af_ca01_cf_ca10_cf_ca11_af_ca11	; Table 31: DAA AF out, CF = 0, AF = 1
-	dw	biosbase
-	dw	daa_rslt_ca10	; Table 32: DAA result, CF = 1, AF = 0
-	dw	biosbase
-	dw	daa_af_ca01_cf_ca10_cf_ca11_af_ca11_das_af_ca01_cf_ca10_cf_ca11_af_ca11	; Table 33: DAA CF out, CF = 1, AF = 0
-	dw	biosbase
-	dw	daa_af_ca00_ca10_das_af_ca00_ca10	; Table 34: DAA AF out, CF = 1, AF = 0
-	dw	biosbase
-	dw	daa_rslt_ca11	; Table 35: DAA result, CF = 1, AF = 1
-	dw	biosbase
-	dw	daa_af_ca01_cf_ca10_cf_ca11_af_ca11_das_af_ca01_cf_ca10_cf_ca11_af_ca11	; Table 36: DAA CF out, CF = 1, AF = 1
-	dw	biosbase
-	dw	daa_af_ca01_cf_ca10_cf_ca11_af_ca11_das_af_ca01_cf_ca10_cf_ca11_af_ca11	; Table 37: DAA AF out, CF = 1, AF = 1
-	dw	biosbase
-	dw	das_rslt_ca00	; Table 38: DAS result, CF = 0, AF = 0
-	dw	biosbase
-	dw	daa_cf_ca00_ca01_das_cf_ca00	; Table 39: DAS CF out, CF = 0, AF = 0
-	dw	biosbase
-	dw	daa_af_ca00_ca10_das_af_ca00_ca10	; Table 40: DAS AF out, CF = 0, AF = 0
-	dw	biosbase
-	dw	das_rslt_ca01	; Table 41: DAS result, CF = 0, AF = 1
-	dw	biosbase
-	dw	das_cf_ca01	; Table 42: DAS CF out, CF = 0, AF = 1
-	dw	biosbase
-	dw	daa_af_ca01_cf_ca10_cf_ca11_af_ca11_das_af_ca01_cf_ca10_cf_ca11_af_ca11	; Table 43: DAS AF out, CF = 0, AF = 1
-	dw	biosbase
-	dw	das_rslt_ca10	; Table 44: DAS result, CF = 1, AF = 0
-	dw	biosbase
-	dw	daa_af_ca01_cf_ca10_cf_ca11_af_ca11_das_af_ca01_cf_ca10_cf_ca11_af_ca11	; Table 45: DAS CF out, CF = 1, AF = 0
-	dw	biosbase
-	dw	daa_af_ca00_ca10_das_af_ca00_ca10	; Table 46: DAS AF out, CF = 1, AF = 0
-	dw	biosbase
-	dw	das_rslt_ca11	; Table 47: DAS result, CF = 1, AF = 1
-	dw	biosbase
-	dw	daa_af_ca01_cf_ca10_cf_ca11_af_ca11_das_af_ca01_cf_ca10_cf_ca11_af_ca11	; Table 48: DAS CF out, CF = 1, AF = 1
-	dw	biosbase
-	dw	daa_af_ca01_cf_ca10_cf_ca11_af_ca11_das_af_ca01_cf_ca10_cf_ca11_af_ca11	; Table 49: DAS AF out, CF = 1, AF = 1
-	dw	biosbase
-	dw	parity		; Table 50: Parity flag loop-up table (256 entries)
-	dw	biosbase
-	dw	i_opcodes	; Table 51: 8-bit opcode lookup table
-	dw	biosbase
+	dw	ex_data		; Table 9: Translation of Raw ID to Extra Data
+	dw	std_flags	; Table 10: How each Raw ID sets the flags (bit 1 = sets SZP, bit 2 = sets AF/OF for arithmetic, bit 3 = sets OF/CF for logic)
+	dw	parity		; Table 11: Parity flag loop-up table (256 entries)
+	dw	i_opcodes	; Table 12: 8-bit opcode lookup table
+	dw	base_size	; Table 13: Translation of Raw ID to base instruction size (bytes)
+	dw	i_w_adder	; Table 14: Translation of Raw ID to i_w size adder yes/no
+	dw	i_mod_adder	; Table 15: Translation of Raw ID to i_mod size adder yes/no
+	dw	jxx_dec_a	; Table 16: Jxx decode table A
+	dw	jxx_dec_b	; Table 17: Jxx decode table B
+	dw	jxx_dec_c	; Table 18: Jxx decode table C
+	dw	jxx_dec_d	; Table 19: Jxx decode table D
+	dw	flags_mult	; Table 20: FLAGS multipliers
 
 ; These values (BIOS ID string, BIOS date and so forth) go at the very top of memory
 
-biosstr	db	'8086tiny BIOS Revision 1.10!', 0, 0		; Why not?
-mem_top	db	0xea, 0, 0x01, 0, 0xf0, '01/11/14', 0, 0xfe, 0
+biosstr	db	'8086tiny BIOS Revision 1.50!', 0, 0		; Why not?
+mem_top	db	0xea, 0, 0x01, 0, 0xf0, '02/09/14', 0, 0xfe, 0
 
 bios_entry:
 
@@ -180,7 +89,9 @@ bios_entry:
 	mov	di, 49
 	stosb			; Set XF = 0
 
-	; Now we can do whatever we want!
+	; Now we can do whatever we want! DL starts off being the boot disk.
+
+	mov	[cs:boot_device], dl
 
 	; Set up Hercules graphics support. We start with the adapter in text mode
 
@@ -189,9 +100,6 @@ bios_entry:
 	mov	dx, 0x3b8
 	mov	al, 0
 	out	dx, al		; Set Hercules support to text mode
-
-	mov	dx, 0		; The IOCCC version of the emulator also uses I/O port 0 as a graphics mode flag
-	out	dx, al
 
 	mov	dx, 0x3b4
 	mov	al, 1		; Hercules CRTC "horizontal displayed" register select
@@ -316,9 +224,9 @@ boot:	mov	ax, 0
 
 	cld
 
-	mov	ax, 0
+	xor	ax, ax
 	mov	es, ax
-	mov	di, 0
+	xor	di, di
 	mov	cx, 512
 	rep	stosw
 
@@ -340,7 +248,7 @@ boot:	mov	ax, 0
 
 	mov	ax, 0xffff
 	mov	es, ax
-	mov	di, 0x0
+	mov	di, 0
 	mov	si, mem_top
 	mov	cx, 16
 	rep	movsb
@@ -382,20 +290,18 @@ next_out:
 	cmp	dx, 0xFFF
 	jl	next_out
 
-	mov	dx, 0x3DA	; CGA refresh port
 	mov	al, 0
+
+	mov	dx, 0x3DA	; CGA refresh port
 	out	dx, al
 
 	mov	dx, 0x3BA	; Hercules detection port
-	mov	al, 0
 	out	dx, al
 
 	mov	dx, 0x3B8	; Hercules video mode port
-	mov	al, 0
 	out	dx, al
 
 	mov	dx, 0x3BC	; LPT1
-	mov	al, 0
 	out	dx, al
 
 	mov	dx, 0x40	; PIT channel 0
@@ -403,7 +309,6 @@ next_out:
 	out	dx, al
 
 	mov	dx, 0x62	; PPI - needed for memory parity checks
-	mov	al, 0
 	out	dx, al
 
 ; Read boot sector from FDD, and load it into 0:7C00
@@ -412,7 +317,8 @@ next_out:
 	mov	es, ax
 
 	mov	ax, 0x0201
-	mov	dx, 0		; Read from FDD
+	mov	dh, 0
+	mov	dl, [cs:boot_device]
 	mov	cx, 1
 	mov	bx, 0x7c00
 	int	13h
@@ -450,7 +356,86 @@ int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
 
 	; Retrieve the keystroke
 
-	mov	al, [es:this_keystroke-bios_data]
+	mov	ax, [es:this_keystroke-bios_data]
+	mov	byte [es:this_keystroke+1-bios_data], 0
+
+  real_key:
+
+	cmp	ah, 0 ; Not SDL code for special key (e.g. cursor move)
+	je	check_linux_bksp
+
+	cmp	ax, 512 ; Alt+something?
+	jb	check_sdl_f_keys
+
+	sub	ax, 512
+
+	cmp	ax, 160 ; Alt+Space?
+	jne	next_sdl_alt_keys
+	mov	al, ' '
+	mov	byte [es:this_keystroke-bios_data], al
+
+  next_sdl_alt_keys:
+
+	push	ax
+	mov	byte [es:next_key_alt-bios_data], 1
+	mov	byte [es:keyflags1-bios_data], 8 ; Alt flag down
+	mov	byte [es:keyflags2-bios_data], 2 ; Alt flag down
+	mov	al, 0x38 ; Simulated Alt by Ctrl+A prefix?
+	out	0x60, al
+	int	9
+	pop	ax
+
+  check_sdl_f_keys:
+
+	cmp	ax, 293
+	ja	i2_dne ; Unknown key
+
+	cmp	ax, 282
+	jb	check_sdl_pgup_pgdn_keys
+
+	sub	ax, 233
+	cmp	ax, 58 ; F10?
+	jne	next_sdl_f_key
+	sub	ax, 10
+
+  next_sdl_f_key:
+
+	mov	byte [es:next_key_fn-bios_data], 1
+	mov	byte [es:this_keystroke-bios_data], al
+	jmp	i2_n
+
+  check_sdl_pgup_pgdn_keys:
+
+	cmp	ax, 280
+	jb	check_cursor_keys
+
+	cmp	ax, 280 ; PgUp?
+	jne	next_sdl_pgdn
+	mov	byte [es:next_key_fn-bios_data], 1
+	mov	byte [es:this_keystroke-bios_data], 'q'
+	jmp	i2_n
+
+  next_sdl_pgdn:
+
+	cmp	ax, 281 ; PgDn?
+	jne	check_sdl_f_keys
+	mov	byte [es:next_key_fn-bios_data], 1
+	mov	byte [es:this_keystroke-bios_data], 'o'
+	jmp	i2_n
+
+  check_cursor_keys:
+
+	cmp	ax, 273 ; SDL cursor keys
+	jb	check_linux_bksp ; No special handling for other keys yet
+	
+	sub	ax, 208 ; Magic number: convert SDL cursor keys to Linux-style cursor keys
+	mov	byte [es:escape_flag-bios_data], 2
+	jmp	i2_noesc
+
+  check_linux_bksp:
+
+	cmp	al, 0 ; Null keystroke - ignore
+	je	i2_dne
 
 	cmp	al, 0x7f ; Linux code for backspace - change to 8
 	jne	after_check_bksp
@@ -459,6 +444,9 @@ int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
 	mov	byte [es:this_keystroke-bios_data], 8
 
   after_check_bksp:
+
+	cmp	byte [es:next_key_fn-bios_data], 1 ; If previous keypress was Ctrl+F (signifying this key is is Fxx), skip checks for Ctrl+A (Alt+xx) and Ctrl+F (Fxx)
+	je	i2_n
 
 	cmp	al, 0x01 ; Ctrl+A pressed - this is the sequence for "next key is Alt+"
 	jne	i2_not_alt
@@ -488,7 +476,6 @@ int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
 
 	cmp	al, 0xe0 ; Some OSes return scan codes after 0xE0 for things like cursor moves. So, if we find it, set a flag saying the next code received should not be translated.
 	mov	byte [es:notranslate_flg-bios_data], 1
-	; je	after_translate
 	je	i2_dne	; Don't add the 0xE0 to the keyboard buffer
 
 	mov	byte [es:notranslate_flg-bios_data], 0
@@ -523,7 +510,7 @@ int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
 	cmp	byte [es:escape_flag-bios_data], 1
 	jne	i2_noesc
 
-	; It is, so check if this key is a ] character
+	; It is, so check if this key is a [ control character
 	cmp	al, '[' ; [ key pressed
 	je	i2_esc
 
@@ -561,35 +548,11 @@ int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
 	mov	byte [es:keyflags2-bios_data], 0
 
 	; Last + this characters are ESC ] xxx - cursor key, so translate and stuff it
-	cmp	al, 'A'
-	je	i2_cur_up
-	cmp	al, 'B'
-	je	i2_cur_down
-	cmp	al, 'D'
-	je	i2_cur_left
-	cmp	al, 'C'
-	je	i2_cur_right
-
-  i2_cur_up:
-
-	mov	al, 0x48 ; Translate UNIX code to cursor key scancode
+	sub	al, 'A'
+	mov	bx, unix_cursor_xlt
+	xlat
 	jmp	after_translate
-
-  i2_cur_down:
-
-	mov	al, 0x50 ; Translate UNIX code to cursor key scancode
-	jmp	after_translate
-
-  i2_cur_left:
-
-	mov	al, 0x4b ; Translate UNIX code to cursor key scancode
-	jmp	after_translate
-
-  i2_cur_right:
-
-	mov	al, 0x4d ; Translate UNIX code to cursor key scancode
-	jmp	after_translate
-
+	
   i2_regular_key:
 
 	mov	byte [es:notranslate_flg-bios_data], 0
@@ -617,7 +580,7 @@ int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
 
 	pop	ax
 
-	test	al, 1
+	test	al, 1 ; Shift down?
 	jz	i2_n
 
 	mov	al, 0x36 ; Right shift down
@@ -635,6 +598,12 @@ int7:	; Whenever the user presses a key, INT 7 is called by the emulator.
 	cmp	byte [es:next_key_fn-bios_data], 1	; Fxx?
 	jne	after_translate
 
+	cmp	byte [es:bp], 1 ; Ctrl+F then Ctrl+A outputs code for Ctrl+A
+	je	after_translate
+
+	cmp	byte [es:bp], 6 ; Ctrl+F then Ctrl+F outputs code for Ctrl+F  
+	je	after_translate
+	
 	mov	byte [es:bp], 0	; Fxx key, so zero out ASCII code
 	add	al, 0x39
 
@@ -662,9 +631,12 @@ skip_ascii_zero:
 	; Output key down/key up event (scancode in AL) to keyboard port
 	call	keypress_release
 
-	; If scan code is not 0xE0, then also send right shift up
+	; If scan code is not 0xE0, then also send right shift up if necessary
 	cmp	al, 0xe0
 	je	i2_dne
+
+	test	byte [es:keyflags1-bios_data], 1
+	jz	check_alt
 
 	mov	al, 0xb6 ; Right shift up
 	out	0x60, al
@@ -733,34 +705,10 @@ skip_timer_increment:
 
 	inc	byte [cs:int8_call_cnt]
 
-	; A Hercules graphics adapter flips bit 7 of I/O port 3BA, every now and then, apparently!
+	; A Hercules graphics adapter flips bit 7 of I/O port 3BA on refresh
 	mov	dx, 0x3BA
 	in 	al, dx
 	xor	al, 0x80
-	out	dx, al
-
-	; We now need to convert the data in I/O port 0x3B8 (Hercules settings) to a new format in
-	; I/O port 0, which we use in the IOCCC version of the emulator for code compactness.
-	; Basically this port will contain 0 if the Hercules graphics is disabled, 2 otherwise. Note,
-	; this is not used in 8086tiny.
-
-	mov	dx, 0x3B8
-	in	al, dx
-	test	al, 2
-	jnz	herc_gfx_mode
-
-	; Hercules is in text mode, so set I/O port 0 to 0
-
-	mov	al, 0
-	jmp	io_init_continue
-
-herc_gfx_mode:
-
-	mov	al, 2
-
-io_init_continue:
-
-	mov	dx, 0
 	out	dx, al
 
 	; See if we have any keys down. If so, release them
@@ -805,17 +753,12 @@ i8_stuff_esc:
 	call	keypress_release
 
 i8_end:	
-	; Now, reset emulated PIC
-
-	; mov	al, 0
-	; mov	dx, 0x20
-	; out	dx, al
 
 	pop	si
 	pop	ds
 	pop	di
 	pop	cx
-
+	
 	pop	es
 	pop	bp
 	pop	dx
@@ -850,10 +793,8 @@ int10:
 	je	int10_write_char
 	cmp	ah, 0x0f ; Get video mode
 	je	int10_get_vm
-	;cmp	ah, 0x12 ; Feature check (EGA)
-	;je	int10_ega_features
-	;cmp	ah, 0x1a ; Feature check
-	;je	int10_features
+	; cmp	ah, 0x1a ; Feature check
+	; je	int10_features
 
 	iret
 
@@ -920,25 +861,14 @@ int10:
 	jne	cur_visible
 
 	mov	byte [cursor_visible-bios_data], 0	; Hide cursor
+	call	ansi_hide_cursor
+	jmp	cur_done
 
     cur_visible:
 
-	mov	al, 0x1B
-	extended_putchar_al
-	mov	al, '['
-	extended_putchar_al
-	mov	al, '?'
-	extended_putchar_al
-	mov	al, '2'
-	extended_putchar_al
-	mov	al, '5'
-	extended_putchar_al
-	mov	al, 'l'
-	sub	al, [cursor_visible-bios_data]
-	sub	al, [cursor_visible-bios_data]
-	sub	al, [cursor_visible-bios_data]
-	sub	al, [cursor_visible-bios_data]
-	extended_putchar_al
+	call	ansi_show_cursor
+
+    cur_done:
 
 	pop	cx
 	pop	ax
@@ -953,15 +883,26 @@ int10:
 	mov	ax, 0x40
 	mov	es, ax
 
+	mov	[es:curpos_y-bios_data], dh
+	mov	[es:crt_curpos_y-bios_data], dh
+	mov	[es:curpos_x-bios_data], dl
+	mov	[es:crt_curpos_x-bios_data], dl
+
 	cmp	dh, 24
-	jb	skip_set_cur_row_max
-	mov	dh, 24
+	jbe	skip_set_cur_row_max
+
+	; If cursor is moved off the screen, then hide it
+	call	ansi_hide_cursor
+	jmp	skip_set_cur_ansi
 	
     skip_set_cur_row_max:
 
      	cmp	dl, 79
-	jb	skip_set_cur_col_max
-	mov	dl, 79
+	jbe	skip_set_cur_col_max
+
+	; If cursor is moved off the screen, then hide it
+	call	ansi_hide_cursor
+	jmp	skip_set_cur_ansi
 	
     skip_set_cur_col_max:
 
@@ -970,35 +911,37 @@ int10:
 	mov	al, '['		; ANSI
 	extended_putchar_al
 	mov	al, dh		; Row number
-	mov	[es:curpos_y-bios_data], al
 	inc	al
 	call	puts_decimal_al
 	mov	al, ';'		; ANSI
 	extended_putchar_al
 	mov	al, dl		; Column number
-	mov	[es:curpos_x-bios_data], al
 	inc	al
 	call	puts_decimal_al
 	mov	al, 'H'		; Set cursor position command
 	extended_putchar_al
 
+	cmp	byte [es:cursor_visible-bios_data], 1
+	jne	skip_set_cur_ansi
+	call	ansi_show_cursor
+
+    skip_set_cur_ansi:
+
 	pop	ax
 	pop	es
 	iret
 
-  int10_get_cursor:		; We don't really support this - just a placeholder
+  int10_get_cursor:
 
 	push	es
-	push	ax
 
-	mov	ax, 0x40
-	mov	es, ax
+	mov	cx, 0x40
+	mov	es, cx
 
 	mov	cx, 0x0607
 	mov	dl, [es:curpos_x-bios_data]
 	mov	dh, [es:curpos_y-bios_data]
 
-	pop	ax
 	pop	es
 
 	iret
@@ -1038,10 +981,10 @@ int10:
 	jne	cls_partial
 
 	cmp	dl, 0x4f ; Clearing columns 0-79
-	jne	cls_partial
+	jb	cls_partial
 
 	cmp	dl, 0x18 ; Clearing rows 0-24 (or more)
-	jl	cls_partial
+	jb	cls_partial
 
 	call	clear_screen
 	iret
@@ -1051,7 +994,6 @@ int10:
 	push 	ax
 	push	bx
 
-	; mov	bx, 0
 	mov	bl, al		; Number of rows to scroll are now in bl
 
 	mov	al, 0x1B	; Escape
@@ -1130,18 +1072,7 @@ cs_fs_ml_out:
 	pop	bx
 	pop	ax
 
-	;push	es
-	;mov	ax, 0x40
-	;mov	es, ax
-	;sub	byte [es:curpos_y-bios_data], bl
-	;cmp	byte [es:curpos_y-bios_data], 0
-	;jnl	int10_scroll_up_vmem_update
-
-	;mov	byte [es:curpos_y-bios_data], 0
-
 int10_scroll_up_vmem_update:
-
-	;pop	es
 
 	; Now, we need to update video memory
 
@@ -1199,18 +1130,6 @@ int10_scroll_up_vmem_update:
 	cmp	ch, dh
 	jae	cls_vmem_scroll_up_one_done
 
-	;jne	vmem_scroll_up_copy_next_row
-
-	;push	cx
-	;mov	cx, ax
-	;mov	ah, 0x47
-	;mov	al, 0
-	;cld
-	;rep	stosw
-	;pop	cx
-
-	;jmp	cls_vmem_scroll_up_one_done
-
 vmem_scroll_up_copy_next_row:
 
 	push	cx
@@ -1246,15 +1165,6 @@ vmem_scroll_up_copy_next_row:
 	mov	al, 'm'
 	extended_putchar_al
 
-	;int	8		; Force display update after scroll
-	;int	8		; Force display update after scroll
-	;int	8		; Force display update after scroll
-	;int	8		; Force display update after scroll
-	;int	8		; Force display update after scroll
-	;int	8		; Force display update after scroll
-	;int	8		; Force display update after scroll
-	;int	8		; Force display update after scroll
-
 	pop	di
 	pop	si
 	pop	dx
@@ -1265,8 +1175,6 @@ vmem_scroll_up_copy_next_row:
 	pop	ax
 	pop	bx
 
-	; pop	bx
-	; pop	ax
 	iret
 	
   int10_scrolldown:
@@ -1381,18 +1289,7 @@ vmem_scroll_up_copy_next_row:
 	pop	bx
 	pop	ax
 
-	;push	es
-	;mov	ax, 0x40
-	;mov	es, ax
-	;add	byte [es:curpos_y-bios_data], bl
-	;cmp	byte [es:curpos_y-bios_data], 25
-	;jna	int10_scroll_down_vmem_update
-
-	;mov	byte [es:curpos_y-bios_data], 25
-
 int10_scroll_down_vmem_update:
-
-	;pop	es
 
 	; Now, we need to update video memory
 
@@ -1503,7 +1400,7 @@ int10_scroll_down_vmem_update:
 	mov	bx, 0x40
 	mov	es, bx
 
-	mov	bx, 0xb000
+	mov	bx, 0xc000
 	mov	ds, bx
 
 	mov	bx, 0
@@ -1536,7 +1433,7 @@ int10_scroll_down_vmem_update:
 	mov	bx, 0x40
 	mov	es, bx
 
-	mov	bx, 0xb000
+	mov	bx, 0xc000
 	mov	ds, bx
 
 	mov	bx, 0
@@ -1548,10 +1445,12 @@ int10_scroll_down_vmem_update:
 	jne	int10_write_char_inc_x
 
 	dec	byte [es:curpos_x-bios_data]
+	dec	byte [es:crt_curpos_x-bios_data]
 	cmp	byte [es:curpos_x-bios_data], 0
 	jg	int10_write_char_done
 
 	mov	byte [es:curpos_x-bios_data], 0    
+	mov	byte [es:crt_curpos_x-bios_data], 0    
 	jmp	int10_write_char_done
 
     int10_write_char_inc_x:
@@ -1563,11 +1462,13 @@ int10_scroll_down_vmem_update:
 	jne	int10_write_char_not_cr
 
 	mov	byte [es:curpos_x-bios_data],0
+	mov	byte [es:crt_curpos_x-bios_data],0
 	jmp	int10_write_char_done
 
     int10_write_char_not_cr:
 
 	inc	byte [es:curpos_x-bios_data]
+	inc	byte [es:crt_curpos_x-bios_data]
 	cmp	byte [es:curpos_x-bios_data], 80
 	jge	int10_write_char_newline
 	jmp	int10_write_char_done
@@ -1575,11 +1476,14 @@ int10_scroll_down_vmem_update:
     int10_write_char_newline:
 
 	mov	byte [es:curpos_x-bios_data], 0
+	mov	byte [es:crt_curpos_x-bios_data], 0
 	inc	byte [es:curpos_y-bios_data]
+	inc	byte [es:crt_curpos_y-bios_data]
 
 	cmp	byte [es:curpos_y-bios_data], 25
 	jb	int10_write_char_done
 	mov	byte [es:curpos_y-bios_data], 24
+	mov	byte [es:crt_curpos_y-bios_data], 24
 
 	push	cx
 	push	dx
@@ -1621,7 +1525,7 @@ int10_scroll_down_vmem_update:
 	mov	bx, 0x40
 	mov	es, bx
 
-	mov	bx, 0xb000
+	mov	bx, 0xc000
 	mov	ds, bx
 
 	mov	bx, 0
@@ -1714,10 +1618,12 @@ cpu	8086
 	jne	int10_write_char_attrib_inc_x
 
 	dec	byte [es:curpos_x-bios_data]
+	dec	byte [es:crt_curpos_x-bios_data]
 	cmp	byte [es:curpos_x-bios_data], 0
 	jg	int10_write_char_attrib_done
 
 	mov	byte [es:curpos_x-bios_data], 0
+	mov	byte [es:crt_curpos_x-bios_data], 0
 	jmp	int10_write_char_attrib_done
 
     int10_write_char_attrib_inc_x:
@@ -1728,12 +1634,14 @@ cpu	8086
 	cmp	al, 0x0D	; Carriage return?
 	jne	int10_write_char_attrib_not_cr
 
-	mov	byte [es:curpos_x-bios_data],0
+	mov	byte [es:curpos_x-bios_data], 0
+	mov	byte [es:crt_curpos_x-bios_data], 0
 	jmp	int10_write_char_attrib_done
 
     int10_write_char_attrib_not_cr:
 
 	inc	byte [es:curpos_x-bios_data]
+	inc	byte [es:crt_curpos_x-bios_data]
 	cmp	byte [es:curpos_x-bios_data], 80
 	jge	int10_write_char_attrib_newline
 	jmp	int10_write_char_attrib_done
@@ -1741,11 +1649,14 @@ cpu	8086
     int10_write_char_attrib_newline:
 
 	mov	byte [es:curpos_x-bios_data], 0
+	mov	byte [es:crt_curpos_x-bios_data], 0
 	inc	byte [es:curpos_y-bios_data]
+	inc	byte [es:crt_curpos_y-bios_data]
 
 	cmp	byte [es:curpos_y-bios_data], 25
 	jb	int10_write_char_attrib_done
 	mov	byte [es:curpos_y-bios_data], 24
+	mov	byte [es:crt_curpos_y-bios_data], 24
 
 	push	cx
 	push	dx
@@ -1780,16 +1691,7 @@ cpu	8086
 
 	iret
 
-  ;int10_ega_features:
-
-;	cmp	bl, 0x10
-;	jne	i10_unsup
-;
-;	mov	bx, 0
-;	mov	cx, 0x0005
-;	iret
-;
- ; int10_features:
+; int10_features:
 ;
 ;	; Signify we have CGA display
 ;
@@ -1840,6 +1742,8 @@ int13:
 	je	int13_format
 	cmp	ah, 0x08 ; Get drive parameters (hard disk)
 	je	int13_getparams
+	cmp	ah, 0x0c ; Seek (hard disk)
+	je	int13_seek
 	cmp	ah, 0x10 ; Check if drive ready (hard disk)
 	je	int13_hdready
 	cmp	ah, 0x15 ; Get disk type
@@ -1884,6 +1788,15 @@ int13:
 
     i_flop_rd:
 
+	push	si
+	push	bp
+
+	cmp	cl, [cs:int1e_spt]
+	ja	rd_error
+
+	pop	bp
+	pop	si
+
 	mov	dl, 1		; Floppy disk file handle is stored at j[1] in emulator
 	jmp	i_rd
 
@@ -1922,9 +1835,16 @@ int13:
 	jne	rd_noerror
 
 	push	ax
+
 	mov	al, [es:bx+24]	; Number of SPT in floppy disk BPB
-	cmp	al, 0		; If disk is unformatted, do not update the table
-	jne	rd_update_spt
+
+	; cmp	al, 0		; If disk is unformatted, do not update the table
+	; jne	rd_update_spt
+	cmp	al, 9		; 9 SPT, i.e. 720K disk, so update the table
+	je	rd_update_spt
+	cmp	al, 18
+	je	rd_update_spt	; 18 SPT, i.e. 1.44MB disk, so update the table
+
 	pop	ax
 
 	jmp	rd_noerror
@@ -2060,9 +1980,14 @@ wr_fine:
 
     i_gp_fl:
 
+	push	cs
+	pop	es
+	mov	di, int1e	; ES:DI now points to floppy parameters table (INT 1E)
+
 	mov	ax, 0
 	mov	bx, 4
-	mov	cx, 0x4f12
+	mov	ch, 0x4f
+	mov	cl, [cs:int1e_spt]
 	mov	dx, 0x0101
 
 	mov	byte [cs:disk_laststatus], 0
@@ -2081,6 +2006,11 @@ wr_fine:
 	xchg	ch, cl
 
 	mov	byte [cs:disk_laststatus], 0
+	jmp	reach_stack_clc
+
+  int13_seek:
+
+	mov	ah, 0
 	jmp	reach_stack_clc
 
   int13_hdready:
@@ -2136,13 +2066,12 @@ int14:
 	cmp	ah, 0
 	je	int14_init
 
-	iret
+	jmp	reach_stack_stc
 
   int14_init:
 
 	mov	ax, 0
-
-	iret
+	jmp	reach_stack_stc
 
 ; ************************* INT 15h - get system configuration
 
@@ -2304,12 +2233,12 @@ int17:
 	cmp	ah, 0x01
 	je	int17_initprint ; Initialise printer
 
-	iret
+	jmp	reach_stack_stc
 
   int17_initprint:
 
-	mov	ah, 0
-	iret
+	mov	ah, 1 ; No printer
+	jmp	reach_stack_stc
 
 ; ************************* INT 19h = reboot
 
@@ -2483,7 +2412,7 @@ int1e:
 		db 0x02 ; Head load time 4 ms, non-DMA mode 0
 		db 0x25 ; Byte delay until motor turned off
 		db 0x02 ; 512 bytes per sector
-int1e_spt	db 0xff	; 18 sectors per track (1.44MB)
+int1e_spt	db 18	; 18 sectors per track (1.44MB)
 		db 0x1B ; Gap between sectors for 3.5" floppy
 		db 0xFF ; Data length (ignored)
 		db 0x54 ; Gap length when formatting
@@ -2793,7 +2722,9 @@ clear_screen:
 	mov	ax, 0x40
 	mov	es, ax
 	mov	byte [es:curpos_x-bios_data], 0
+	mov	byte [es:crt_curpos_x-bios_data], 0
 	mov	byte [es:curpos_y-bios_data], 0
+	mov	byte [es:crt_curpos_y-bios_data], 0
 
 	pop	es
 	pop	ax
@@ -2960,18 +2891,7 @@ vram_update:
 	cmp	byte [cursor_visible-bios_data], 0
 	je	dont_hide_cursor
 
-	mov	al, 0x1B
-	extended_putchar_al
-	mov	al, '['
-	extended_putchar_al
-	mov	al, '?'
-	extended_putchar_al
-	mov	al, '2'
-	extended_putchar_al
-	mov	al, '5'
-	extended_putchar_al
-	mov	al, 'l'
-	extended_putchar_al
+	call	ansi_hide_cursor
 
 dont_hide_cursor:
 
@@ -3014,6 +2934,15 @@ cont:
 	mov	bx, si
 	mov	dh, al
 	mov	dl, bl
+
+	cmp	dh, [cs:int_curpos_y]	; Advanced a row since the last time?
+	jne	ansi_set_cur_pos
+	push	dx
+	dec	dl
+	cmp	dl, [cs:int_curpos_x]	; Advanced anything but one column since the last time?
+	pop	dx
+	jne	ansi_set_cur_pos
+	jmp	skip_set_cur_pos
 
 ansi_set_cur_pos:
 
@@ -3095,15 +3024,11 @@ skip_attrib:
 
 	mov	al, [di]
 
-	cmp	al, 7		; Convert BEL character to 0xFE
-	jne	check_space1
-	mov	al, 0xFE
+	cmp	al, 32		; Non-printable ASCII? (< 32 decimal)
+	jae	just_show_it
 
-check_space1:
-
-	cmp	al, 4		; Convert DIAMOND character to 0xFE
-	jne	just_show_it
-	mov	al, 0xFE
+	mov	bx, low_ascii_conv
+	cs	xlat		; Convert to printable representation (mostly spaces)
 
 just_show_it:
 
@@ -3116,11 +3041,44 @@ restore_cursor:
 	mov	bx, 0x40
 	mov	ds, bx
 
-	mov	ah, 2
-	mov	bh, 0
-	mov	dh, [curpos_y-bios_data]
-	mov	dl, [curpos_x-bios_data]
-	int	10h
+	; On a real PC, the 6845 CRT cursor position registers take place over the BIOS
+	; Data Area ones. So, if the cursor is not off the screen, set it to the CRT
+	; position.
+
+	mov	bh, [crt_curpos_y-bios_data]
+	mov	bl, [crt_curpos_x-bios_data]
+	
+	cmp	bh, 24
+	ja	vmem_end_hidden_cursor
+	cmp	bl, 79
+	ja	vmem_end_hidden_cursor
+
+	mov	al, 0x1B	; ANSI
+	extended_putchar_al
+	mov	al, '['		; ANSI
+	extended_putchar_al
+	mov	al, bh		; Row number
+	inc	al
+	call	puts_decimal_al
+	mov	al, ';'		; ANSI
+	extended_putchar_al
+	mov	al, bl		; Column number
+	inc	al
+	call	puts_decimal_al
+	mov	al, 'H'		; Set cursor position command
+	extended_putchar_al
+
+	cmp	byte [cursor_visible-bios_data], 1
+	jne	vmem_end_hidden_cursor
+
+	call	ansi_show_cursor
+	jmp	skip_restore_cursor
+
+vmem_end_hidden_cursor:
+
+	call	ansi_hide_cursor
+
+skip_restore_cursor:
 
 	mov	al, 0x1B	; Escape
 	extended_putchar_al
@@ -3131,8 +3089,14 @@ restore_cursor:
 	mov	al, 'm'
 	extended_putchar_al
 
-	cmp	byte [cursor_visible-bios_data], 0
-	je	vmem_done
+vmem_done:
+
+	mov	byte [cs:in_update], 0
+	ret
+
+; Show cursor using ANSI codes
+
+ansi_show_cursor:
 
 	mov	al, 0x1B
 	extended_putchar_al
@@ -3147,9 +3111,25 @@ restore_cursor:
 	mov	al, 'h'
 	extended_putchar_al
 
-vmem_done:
+	ret
 
-	mov	byte [cs:in_update], 0
+; Hide cursor using ANSI codes
+
+ansi_hide_cursor:
+
+	mov	al, 0x1B
+	extended_putchar_al
+	mov	al, '['
+	extended_putchar_al
+	mov	al, '?'
+	extended_putchar_al
+	mov	al, '2'
+	extended_putchar_al
+	mov	al, '5'
+	extended_putchar_al
+	mov	al, 'l'
+	extended_putchar_al
+
 	ret
 
 ; ****************************************************************************************
@@ -3234,9 +3214,9 @@ kb_led		db	0
 		db	0
 		db	0
 		db	0
-		db	0
-		db	0
-		db	0
+boot_device	db	0
+crt_curpos_x	db	0
+crt_curpos_y	db	0
 key_now_down	db	0
 next_key_fn	db	0
 cursor_visible	db	1
@@ -3245,7 +3225,7 @@ next_key_alt	db	0
 escape_flag	db	0
 notranslate_flg	db	0
 this_keystroke	db	0
-		db	0
+this_keystroke_ext		db	0
 ending:		times (0xff-($-com1addr)) db	0
 
 ; Keyboard scan code tables
@@ -3319,9 +3299,17 @@ int_table	dw int0
 
 itbl_size	dw $-int_table
 
-; Colour table for converting CGA video memory colours to ANSI colours
+; Conversion from CGA video memory colours to ANSI colours
 
 colour_table	db	30, 34, 32, 36, 31, 35, 33, 37
+
+; Conversion from non-printable low ASCII to printable
+
+low_ascii_conv	db	' ', 250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250, '><|!|$', 250, '|^v><--^v'
+
+; Conversion from UNIX cursor keys to scancodes
+
+unix_cursor_xlt	db	0x48, 0x50, 0x4d, 0x4b
 
 ; Internal variables for VMEM driver
 
@@ -3340,12 +3328,11 @@ int8_call_cnt	db	0
 ; R/M mode tables
 
 rm_mode0_reg1	db	3, 3, 5, 5, 6, 7, 12, 3
-rm_mode0_reg2	db	6, 7, 6, 7, 12, 12, 12, 12
+rm_mode012_reg2	db	6, 7, 6, 7, 12, 12, 12, 12
 rm_mode0_disp	db	0, 0, 0, 0, 0, 0, 1, 0
 rm_mode0_dfseg	db	11, 11, 10, 10, 11, 11, 11, 11
 
 rm_mode12_reg1	db	3, 3, 5, 5, 6, 7, 5, 3
-rm_mode12_reg2	db	6, 7, 6, 7, 12, 12, 12, 12
 rm_mode12_disp	db	1, 1, 1, 1, 1, 1, 1, 1
 rm_mode12_dfseg	db	11, 11, 10, 10, 11, 11, 10, 11
 
@@ -3353,10 +3340,9 @@ rm_mode12_dfseg	db	11, 11, 10, 10, 11, 11, 10, 11
 
 xlat_ids	db	0, 1, 2, 2, 3, 4, 5, 6, 7, 7, 7, 7, 7, 7, 7, 7, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 47, 17, 17, 18, 19, 20, 19, 21, 22, 21, 22, 23, 53, 24, 25, 26, 25, 25, 26, 25, 26, 27, 28, 27, 28, 27, 29, 27, 29, 48, 30, 31, 32, 53, 33, 34, 35, 36, 37, 37, 38, 39, 40, 19, 41, 42, 43, 44, 53, 53, 45, 46, 46, 46, 46, 46, 46, 52, 52, 12
 i_opcodes	db	17, 17, 17, 17, 8, 8, 49, 50, 18, 18, 18, 18, 9, 9, 51, 64, 19, 19, 19, 19, 10, 10, 52, 53, 20, 20, 20, 20, 11, 11, 54, 55, 21, 21, 21, 21, 12, 12, 56, 57, 22, 22, 22, 22, 13, 13, 58, 59, 23, 23, 23, 23, 14, 14, 60, 61, 24, 24, 24, 24, 15, 15, 62, 63, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 16, 16, 16, 31, 31, 48, 48, 25, 25, 25, 25, 26, 26, 26, 26, 32, 32, 32, 32, 32, 32, 32, 32, 65, 66, 67, 68, 69, 70, 71, 72, 27, 27, 27, 27, 33, 33, 34, 34, 35, 35, 36, 36, 37, 37, 38, 38, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 94, 94, 39, 39, 73, 74, 40, 40, 0, 0, 41, 41, 75, 76, 77, 78, 28, 28, 28, 28, 79, 80, 81, 82, 47, 47, 47, 47, 47, 47, 47, 47, 29, 29, 29, 29, 42, 42, 43, 43, 30, 30, 30, 30, 44, 44, 45, 45, 83, 0, 46, 46, 84, 85, 7, 7, 86, 87, 88, 89, 90, 91, 6, 6
-ex_data  	db	21, 0, 0, 1, 0, 0, 0, 21, 0, 1, 2, 3, 4, 5, 6, 7, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 0, 0, 43, 0, 0, 0, 0, 0, 0, 1, 2, 1, 0, 0, 1, 0, 0, 1, 1, 0, 3, 0, 8, 8, 9, 10, 10, 11, 11, 8, 27, 9, 39, 10, 2, 11, 0, 36, 0, 0, 0, 0, 0, 0, 255, 0, 16, 22, 0, 255, 48, 2, 255, 255, 40, 11, 1, 2, 40, 80, 81, 92, 93, 94, 95, 0, 21, 1
-std_szp  	db	0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0
-std_ao   	db	0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0
-std_o0c0	db	0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+ex_data  	db	21, 0, 0, 1, 0, 0, 0, 21, 0, 1, 2, 3, 4, 5, 6, 7, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 0, 0, 43, 0, 0, 0, 0, 0, 0, 1, 2, 1, 0, 0, 1, 0, 0, 1, 1, 0, 3, 0, 8, 8, 9, 10, 10, 11, 11, 8, 0, 9, 1, 10, 2, 11, 0, 36, 0, 0, 0, 0, 0, 0, 255, 0, 16, 22, 0, 255, 48, 2, 255, 255, 40, 11, 1, 2, 40, 80, 81, 92, 93, 94, 95, 0, 21, 1
+;ex_data  	db	21, 0, 0, 1, 0, 0, 0, 21, 0, 1, 2, 3, 4, 5, 6, 7, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 0, 0, 43, 0, 0, 0, 0, 0, 0, 1, 2, 1, 0, 0, 1, 0, 0, 1, 1, 0, 3, 0, 8, 8, 9, 10, 10, 11, 11, 8, 27, 9, 39, 10, 2, 11, 0, 36, 0, 0, 0, 0, 0, 0, 255, 0, 16, 22, 0, 255, 48, 2, 255, 255, 40, 11, 1, 2, 40, 80, 81, 92, 93, 94, 95, 0, 21, 1
+std_flags	db	0, 0, 1, 1, 0, 0, 0, 0, 3, 5, 1, 1, 5, 3, 5, 3, 1, 3, 5, 1, 1, 5, 3, 5, 3, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0
 base_size	db	2, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2, 2, 0, 2, 1, 1, 1, 1, 1, 1, 1, 0, 2, 0, 2, 2, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 1, 1, 1, 1, 1, 2, 2, 0, 0, 0, 0, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3
 i_w_adder	db	0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 i_mod_adder	db	0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
@@ -3367,26 +3353,6 @@ jxx_dec_a	db	48, 40, 43, 40, 44, 41, 49, 49
 jxx_dec_b	db	49, 49, 49, 43, 49, 49, 49, 43
 jxx_dec_c	db	49, 49, 49, 49, 49, 49, 44, 44
 jxx_dec_d	db	49, 49, 49, 49, 49, 49, 48, 48
-
-daa_rslt_ca00	db	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 16, 17, 18, 19, 20, 21, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 32, 33, 34, 35, 36, 37, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 48, 49, 50, 51, 52, 53, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 64, 65, 66, 67, 68, 69, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 80, 81, 82, 83, 84, 85, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 96, 97, 98, 99, 100, 101, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 112, 113, 114, 115, 116, 117, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 128, 129, 130, 131, 132, 133, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 144, 145, 146, 147, 148, 149, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 16, 17, 18, 19, 20, 21, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 32, 33, 34, 35, 36, 37, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 48, 49, 50, 51, 52, 53, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 64, 65, 66, 67, 68, 69, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 80, 81, 82, 83, 84, 85, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 96, 97, 98, 99, 100, 101
-daa_cf_ca00_ca01_das_cf_ca00	db	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-daa_af_ca00_ca10_das_af_ca00_ca10	db	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1
-
-daa_rslt_ca01	db	6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101
-daa_af_ca01_cf_ca10_cf_ca11_af_ca11_das_af_ca01_cf_ca10_cf_ca11_af_ca11	db	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-
-daa_rslt_ca10	db	96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 112, 113, 114, 115, 116, 117, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 128, 129, 130, 131, 132, 133, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 144, 145, 146, 147, 148, 149, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 160, 161, 162, 163, 164, 165, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 176, 177, 178, 179, 180, 181, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 192, 193, 194, 195, 196, 197, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 208, 209, 210, 211, 212, 213, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 224, 225, 226, 227, 228, 229, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 240, 241, 242, 243, 244, 245, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 16, 17, 18, 19, 20, 21, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 32, 33, 34, 35, 36, 37, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 48, 49, 50, 51, 52, 53, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 64, 65, 66, 67, 68, 69, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 80, 81, 82, 83, 84, 85, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 96, 97, 98, 99, 100, 101
-
-daa_rslt_ca11	db	102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101
-
-das_rslt_ca00	db	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 4, 5, 6, 7, 8, 9, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 20, 21, 22, 23, 24, 25, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 36, 37, 38, 39, 40, 41, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 52, 53, 54, 55, 56, 57, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 68, 69, 70, 71, 72, 73, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 84, 85, 86, 87, 88, 89, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 100, 101, 102, 103, 104, 105, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 116, 117, 118, 119, 120, 121, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 132, 133, 134, 135, 136, 137, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 52, 53, 54, 55, 56, 57, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 68, 69, 70, 71, 72, 73, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 84, 85, 86, 87, 88, 89, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 100, 101, 102, 103, 104, 105, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 116, 117, 118, 119, 120, 121, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 132, 133, 134, 135, 136, 137, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 148, 149, 150, 151, 152, 153
-
-das_rslt_ca01	db	154, 155, 156, 157, 158, 159, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153
-das_cf_ca01	db	1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-
-das_rslt_ca10	db	160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 164, 165, 166, 167, 168, 169, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 180, 181, 182, 183, 184, 185, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 196, 197, 198, 199, 200, 201, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 212, 213, 214, 215, 216, 217, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 228, 229, 230, 231, 232, 233, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 244, 245, 246, 247, 248, 249, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 4, 5, 6, 7, 8, 9, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 20, 21, 22, 23, 24, 25, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 36, 37, 38, 39, 40, 41, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 52, 53, 54, 55, 56, 57, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 68, 69, 70, 71, 72, 73, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 84, 85, 86, 87, 88, 89, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 100, 101, 102, 103, 104, 105, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 116, 117, 118, 119, 120, 121, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 132, 133, 134, 135, 136, 137, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 148, 149, 150, 151, 152, 153
-
-das_rslt_ca11	db	154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153
 
 parity		db	1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1
 
